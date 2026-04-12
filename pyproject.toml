@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "incidentops-openenv"
+version = "1.0.0"
+description = "IncidentOps OpenEnv — A real-world incident command training environment for AI agents"
+authors = [
+    {name = "Visionary Coders", email = "pallachetana@gmail.com"},
+    {name = "Visionary Coders", email = "varshini.nasaram@gmail.com"},
+    {name = "Visionary Coders", email = "obulagarinandini@gmail.com"},
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.20.0",
+    "pydantic>=2.0.0",
+    "requests>=2.28.0",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+server = "server.app:main"
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx"]
+
+[tool.openenv]
+name = "IncidentOps OpenEnv"
+version = "1.0.0"
+description = "Real-world incident command training environment for AI agents in fintech operations"
+tags = ["openenv", "incident-response", "devops", "fintech", "sre"]
+tasks = ["single_service_outage", "dependency_degradation", "multi_service_incident", "memory_leak_degradation", "cascading_timeout_storm"]
+entry_point = "server.app:app"

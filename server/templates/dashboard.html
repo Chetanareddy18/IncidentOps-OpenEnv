@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IncidentOps — AI Incident Command Center</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0e1a;--card:#111827;--border:#1f2937;--accent:#3b82f6;--red:#ef4444;--amber:#f59e0b;--green:#22c55e;--text:#e5e7eb;--muted:#6b7280}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+.mono{font-family:'JetBrains Mono',monospace}
+.grid-bg{position:fixed;inset:0;background-image:linear-gradient(rgba(59,130,246,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(59,130,246,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+.glow-red{box-shadow:0 0 20px rgba(239,68,68,.15),inset 0 0 20px rgba(239,68,68,.05)}
+.glow-green{box-shadow:0 0 20px rgba(34,197,94,.15),inset 0 0 20px rgba(34,197,94,.05)}
+.glow-amber{box-shadow:0 0 20px rgba(245,158,11,.15),inset 0 0 20px rgba(245,158,11,.05)}
+.glow-blue{box-shadow:0 0 20px rgba(59,130,246,.15),inset 0 0 20px rgba(59,130,246,.05)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:.75rem;padding:1.25rem;position:relative;overflow:hidden;transition:all .3s}
+.card:hover{border-color:rgba(59,130,246,.3)}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(59,130,246,.3),transparent)}
+.badge{padding:3px 10px;border-radius:6px;font-size:.7rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.badge-down{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
+.badge-degraded{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3)}
+.badge-healthy{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3)}
+.sev-sev1{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.4)}
+.sev-sev2{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.4)}
+.sev-sev3{background:rgba(59,130,246,.15);color:#3b82f6;border:1px solid rgba(59,130,246,.4)}
+@keyframes pulse-red{0%,100%{opacity:1}50%{opacity:.5}}
+.pulse{animation:pulse-red 2s ease-in-out infinite}
+.ring{position:relative;width:80px;height:80px}
+.ring svg{transform:rotate(-90deg)}
+.ring-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem}
+.metric-value{font-size:1.75rem;font-weight:700;line-height:1.2}
+.metric-label{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-top:2px}
+.reward-bar{width:28px;min-height:2px;border-radius:3px 3px 0 0;transition:height .3s}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#374151;border-radius:2px}
+.phase-dot{width:10px;height:10px;border-radius:50%;border:2px solid #374151;transition:all .3s}
+.phase-dot.active{background:var(--accent);border-color:var(--accent);box-shadow:0 0 8px rgba(59,130,246,.5)}
+.phase-dot.done{background:var(--green);border-color:var(--green)}
+.phase-line{height:2px;flex:1;background:#374151;transition:background .3s}
+.phase-line.done{background:var(--green)}
+
+/* Toast notifications */
+#toast-container{position:fixed;top:16px;right:16px;z-index:1000;display:flex;flex-direction:column;gap:8px;max-width:380px;pointer-events:none}
+.toast{pointer-events:auto;padding:12px 16px;border-radius:10px;font-size:.8rem;display:flex;align-items:flex-start;gap:10px;animation:slideIn .3s ease-out;backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.08);cursor:pointer;transition:opacity .2s}
+.toast:hover{opacity:.85}
+.toast.toast-critical{background:rgba(239,68,68,.18);border-color:rgba(239,68,68,.4);color:#fca5a5}
+.toast.toast-warning{background:rgba(245,158,11,.18);border-color:rgba(245,158,11,.4);color:#fcd34d}
+.toast.toast-info{background:rgba(59,130,246,.18);border-color:rgba(59,130,246,.4);color:#93c5fd}
+.toast.toast-success{background:rgba(34,197,94,.18);border-color:rgba(34,197,94,.4);color:#86efac}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes fadeOut{from{opacity:1}to{opacity:0;transform:translateX(30px)}}
+.toast.leaving{animation:fadeOut .25s ease-in forwards}
+
+/* Timeline */
+.timeline-item{position:relative;padding-left:24px;padding-bottom:12px;border-left:2px solid #1f2937}
+.timeline-item:last-child{border-left:2px solid transparent}
+.timeline-dot{position:absolute;left:-5px;top:4px;width:8px;height:8px;border-radius:50%;border:2px solid #374151;background:var(--bg)}
+.timeline-dot.dot-action{border-color:var(--accent);background:var(--accent)}
+.timeline-dot.dot-alert{border-color:var(--red);background:var(--red)}
+.timeline-dot.dot-comms{border-color:var(--green);background:var(--green)}
+.timeline-dot.dot-resolve{border-color:var(--green);background:var(--green);width:10px;height:10px;left:-6px;top:3px}
+
+/* Spark chart */
+.spark-line{fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+
+/* Search */
+.search-input{background:#0d1117;border:1px solid #1f2937;border-radius:6px;padding:4px 8px 4px 28px;font-size:.75rem;color:#e5e7eb;outline:none;width:100%;font-family:'JetBrains Mono',monospace}
+.search-input:focus{border-color:rgba(59,130,246,.5)}
+.search-wrap{position:relative}
+.search-icon{position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#4b5563;font-size:.7rem}
+
+/* Resource bars */
+.res-bar-bg{background:#1f2937;border-radius:2px;height:4px;overflow:hidden}
+.res-bar{height:4px;border-radius:2px;transition:width .5s}
+
+/* Control panel */
+.ctrl-btn{padding:6px 14px;border-radius:8px;font-size:.7rem;font-weight:600;letter-spacing:.04em;cursor:pointer;transition:all .2s;border:1px solid transparent;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
+.ctrl-btn:disabled{opacity:.4;cursor:not-allowed}
+.ctrl-btn-primary{background:rgba(59,130,246,.2);color:#60a5fa;border-color:rgba(59,130,246,.4)}
+.ctrl-btn-primary:hover:not(:disabled){background:rgba(59,130,246,.35)}
+.ctrl-btn-danger{background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3)}
+.ctrl-btn-danger:hover:not(:disabled){background:rgba(239,68,68,.3)}
+.ctrl-btn-success{background:rgba(34,197,94,.15);color:#4ade80;border-color:rgba(34,197,94,.3)}
+.ctrl-btn-success:hover:not(:disabled){background:rgba(34,197,94,.3)}
+.ctrl-btn-amber{background:rgba(245,158,11,.15);color:#fbbf24;border-color:rgba(245,158,11,.3)}
+.ctrl-btn-amber:hover:not(:disabled){background:rgba(245,158,11,.3)}
+.ctrl-select{background:#0d1117;border:1px solid #1f2937;border-radius:6px;padding:5px 8px;font-size:.72rem;color:#e5e7eb;outline:none;font-family:'JetBrains Mono',monospace;cursor:pointer}
+.ctrl-select:focus{border-color:rgba(59,130,246,.5)}
+.ctrl-select option{background:#111827;color:#e5e7eb}
+
+/* Auto-demo progress */
+@keyframes demoPulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.3)}50%{box-shadow:0 0 0 8px rgba(34,197,94,0)}}
+.demo-active{animation:demoPulse 1.5s ease-in-out infinite}
+
+/* Industry banner */
+.ind-stat{text-align:center}
+.ind-stat .val{font-size:1.3rem;font-weight:700;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.ind-stat .lbl{font-size:.55rem;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div id="toast-container"></div>
+
+<div class="relative z-10 max-w-[1440px] mx-auto p-4 lg:p-6">
+
+<!-- ── Industry Problem Banner ────────────────────────────── -->
+<div class="card mb-4 border-blue-900/40" style="background:linear-gradient(135deg,#0c1222 0%,#111827 50%,#0f1629 100%)">
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3 flex-1">
+      <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 via-orange-500 to-amber-500 flex items-center justify-center text-2xl shadow-lg shadow-red-500/20">&#x1F6A8;</div>
+      <div>
+        <h1 class="text-lg font-bold text-white tracking-tight">IncidentOps <span class="text-blue-400">AI Command Center</span></h1>
+        <p class="text-[11px] text-gray-400 max-w-md">Production-grade AI agent training for fintech incident response. <span class="text-amber-400">$400B+ lost annually</span> industry-wide from outages. Train AI commanders that resolve incidents <span class="text-green-400">70% faster</span> than manual playbooks.</p>
+      </div>
+    </div>
+    <div class="flex gap-5">
+      <div class="ind-stat"><div class="val">$9.4K</div><div class="lbl">Cost / min downtime</div></div>
+      <div class="ind-stat"><div class="val">68min</div><div class="lbl">Avg MTTR (manual)</div></div>
+      <div class="ind-stat"><div class="val">&lt;12min</div><div class="lbl">Target MTTR (AI)</div></div>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2" title="Real-time connection status">
+        <div id="sse-dot" class="w-2 h-2 rounded-full bg-gray-500"></div>
+        <span id="sse-label" class="text-xs text-gray-500 mono">CONNECTING</span>
+      </div>
+      <button id="notif-toggle" class="text-gray-500 hover:text-gray-300 text-sm" title="Toggle notifications">&#x1F514;</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Control Panel ──────────────────────────────────────── -->
+<div class="card mb-4" style="border-color:rgba(59,130,246,.15)">
+  <div class="flex flex-wrap items-center gap-3">
+    <div class="flex items-center gap-2">
+      <span class="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Scenario</span>
+      <select id="task-select" class="ctrl-select" onchange="updateActionTarget()">
+      </select>
+    </div>
+    <button class="ctrl-btn ctrl-btn-danger" onclick="resetTask()">&#x21BB; Reset</button>
+    <div class="w-px h-6 bg-gray-800"></div>
+    <div class="flex items-center gap-2">
+      <span class="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Action</span>
+      <select id="action-select" class="ctrl-select">
+        <option value="inspect_logs">inspect_logs</option>
+        <option value="inspect_service">inspect_service</option>
+        <option value="restart_service">restart_service</option>
+        <option value="rollback_service">rollback_service</option>
+        <option value="scale_service">scale_service</option>
+        <option value="failover_database">failover_database</option>
+        <option value="send_status_update">send_status_update</option>
+        <option value="send_vip_update">send_vip_update</option>
+        <option value="escalate_to_human">escalate_to_human</option>
+        <option value="resolve_incident">resolve_incident</option>
+      </select>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Target</span>
+      <select id="target-select" class="ctrl-select">
+        <option value="payment_api">payment_api</option>
+        <option value="ledger_service">ledger_service</option>
+        <option value="notification_service">notification_service</option>
+        <option value="db">db</option>
+      </select>
+    </div>
+    <button class="ctrl-btn ctrl-btn-primary" onclick="executeStep()" id="step-btn">&#x25B6; Execute Step</button>
+    <div class="w-px h-6 bg-gray-800"></div>
+    <button class="ctrl-btn ctrl-btn-success" onclick="startAutoDemo()" id="demo-btn">&#x1F916; Auto-Demo</button>
+    <button class="ctrl-btn ctrl-btn-amber hidden" onclick="stopAutoDemo()" id="demo-stop-btn">&#x23F9; Stop Demo</button>
+    <div id="demo-status" class="text-[10px] text-gray-600 mono hidden">Running step <span id="demo-step-num">0</span>...</div>
+    <div class="flex-1"></div>
+    <div id="task-label" class="badge sev-sev3 mono text-xs"></div>
+  </div>
+</div>
+
+<!-- Incident Banner -->
+<div id="banner" class="card mb-4 glow-red">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div class="flex-1">
+      <div class="flex items-center gap-2 mb-2">
+        <span id="sev-badge" class="badge sev-sev1">SEV1</span>
+        <span id="inc-id" class="text-xs text-gray-500 mono">INC-0000</span>
+        <span id="done-badge" class="badge badge-healthy hidden">RESOLVED</span>
+      </div>
+      <h2 id="inc-title" class="text-lg font-semibold text-white mb-3"></h2>
+      <div class="flex items-center gap-1 max-w-md" id="phase-stepper"></div>
+      <div class="flex gap-1 mt-1 max-w-md" id="phase-labels"></div>
+    </div>
+    <div class="flex gap-6 text-center">
+      <div><div id="elapsed" class="metric-value text-amber-400 mono">0</div><div class="metric-label">min elapsed</div></div>
+      <div><div class="flex items-baseline gap-0.5"><span id="step-count" class="metric-value text-blue-400 mono">0</span><span class="text-gray-500 text-sm">/</span><span id="max-steps" class="text-gray-500 text-sm mono">8</span></div><div class="metric-label">steps</div></div>
+      <div class="ring" id="score-ring">
+        <svg width="80" height="80"><circle cx="40" cy="40" r="35" fill="none" stroke="#1f2937" stroke-width="5"/><circle id="score-arc" cx="40" cy="40" r="35" fill="none" stroke="#3b82f6" stroke-width="5" stroke-dasharray="220" stroke-dashoffset="220" stroke-linecap="round"/></svg>
+        <div class="ring-text text-blue-400" id="score-text">0.00</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Grid -->
+<div class="grid grid-cols-12 gap-4 mb-4">
+  <div class="col-span-12 lg:col-span-8 card">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Service Health</h3>
+      <span id="healthy-count" class="text-xs text-gray-500 mono">0/0 healthy</span>
+    </div>
+    <div id="services" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+  </div>
+  <div class="col-span-12 lg:col-span-4 card">
+    <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Customer Impact</h3>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <div class="metric-label">Complaints</div>
+        <div id="complaints" class="metric-value text-red-400 mono">0</div>
+        <svg id="complaints-spark" width="100%" height="24" class="mt-1"></svg>
+      </div>
+      <div>
+        <div class="metric-label">VIP Affected</div>
+        <div id="vip" class="metric-value text-amber-400 mono">0</div>
+      </div>
+      <div>
+        <div class="metric-label">Sentiment</div>
+        <div id="sentiment" class="metric-value mono">0.00</div>
+        <div class="w-full bg-gray-800 rounded-full h-1.5 mt-1">
+          <div id="sent-bar" class="h-1.5 rounded-full transition-all bg-red-500" style="width:50%"></div>
+        </div>
+      </div>
+      <div>
+        <div class="metric-label">Social Noise</div>
+        <div id="social" class="metric-value text-orange-400 mono">0.00</div>
+        <div class="w-full bg-gray-800 rounded-full h-1.5 mt-1">
+          <div id="noise-bar" class="h-1.5 rounded-full transition-all bg-orange-500" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Second Row -->
+<div class="grid grid-cols-12 gap-4 mb-4">
+  <div class="col-span-12 md:col-span-4 card">
+    <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Business Impact</h3>
+    <div class="space-y-4">
+      <div>
+        <div class="metric-label">Revenue Loss / min</div>
+        <div id="rev-min" class="metric-value text-red-400 mono">$0</div>
+      </div>
+      <div>
+        <div class="metric-label">Total Revenue Lost</div>
+        <div id="rev-total" class="metric-value text-red-300 mono">$0</div>
+      </div>
+      <div>
+        <div class="metric-label">SLA Breach Risk</div>
+        <div class="flex items-center gap-2 mt-1">
+          <div class="flex-1 bg-gray-800 rounded-full h-2.5">
+            <div id="sla-bar" class="h-2.5 rounded-full transition-all duration-500" style="width:0%;background:linear-gradient(90deg,#22c55e,#f59e0b,#ef4444)"></div>
+          </div>
+          <span id="sla-pct" class="text-sm mono text-gray-400">0%</span>
+        </div>
+        <svg id="sla-spark" width="100%" height="20" class="mt-1"></svg>
+      </div>
+      <div>
+        <div class="metric-label">Compliance Risk</div>
+        <div class="flex items-center gap-2 mt-1">
+          <div class="flex-1 bg-gray-800 rounded-full h-2.5">
+            <div id="comp-bar" class="h-2.5 rounded-full transition-all duration-500 bg-purple-500" style="width:0%"></div>
+          </div>
+          <span id="comp-pct" class="text-sm mono text-gray-400">0%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-span-12 md:col-span-4 card">
+    <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Operations Status</h3>
+    <div class="space-y-3">
+      <div class="flex items-center justify-between py-1.5 px-3 rounded-lg bg-gray-800/50">
+        <span class="text-sm">Status Page Updated</span>
+        <span id="op-status" class="text-red-400 text-lg">&#x2717;</span>
+      </div>
+      <div class="flex items-center justify-between py-1.5 px-3 rounded-lg bg-gray-800/50">
+        <span class="text-sm">VIP Outreach Sent</span>
+        <span id="op-vip" class="text-red-400 text-lg">&#x2717;</span>
+      </div>
+      <div class="flex items-center justify-between py-1.5 px-3 rounded-lg bg-gray-800/50">
+        <span class="text-sm">Escalated to Human</span>
+        <span id="op-esc" class="text-red-400 text-lg">&#x2717;</span>
+      </div>
+      <div class="flex items-center justify-between py-1.5 px-3 rounded-lg bg-gray-800/50">
+        <span class="text-sm">Incident Bridge Open</span>
+        <span id="op-bridge" class="text-red-400 text-lg">&#x2717;</span>
+      </div>
+    </div>
+    <div class="mt-4 pt-3 border-t border-gray-800">
+      <div class="metric-label">Root Cause</div>
+      <div id="root-cause" class="text-sm mt-1 text-gray-400">Not yet identified</div>
+    </div>
+    <div class="mt-4 pt-3 border-t border-gray-800">
+      <div class="metric-label mb-2">Dependency Graph</div>
+      <div id="dep-graph" class="text-xs mono text-gray-500 space-y-1"></div>
+    </div>
+  </div>
+  <div class="col-span-12 md:col-span-4 card">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Action Log</h3>
+      <div class="flex gap-1">
+        <button id="view-log" class="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30" onclick="toggleView('log')">Log</button>
+        <button id="view-timeline" class="text-[10px] px-2 py-0.5 rounded bg-gray-800 text-gray-500 border border-gray-700" onclick="toggleView('timeline')">Timeline</button>
+      </div>
+    </div>
+    <div class="search-wrap mb-2">
+      <span class="search-icon">&#x1F50D;</span>
+      <input type="text" id="log-search" class="search-input" placeholder="Filter actions..." oninput="filterLog()">
+    </div>
+    <div id="action-log" class="space-y-1.5 max-h-52 overflow-y-auto pr-1"></div>
+    <div id="action-timeline" class="max-h-52 overflow-y-auto pr-1 hidden"></div>
+  </div>
+</div>
+
+<!-- Reward Chart -->
+<div class="card mb-4">
+  <div class="flex items-center justify-between mb-4">
+    <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Reward History</h3>
+    <div class="flex items-center gap-4 text-xs text-gray-500">
+      <span><span class="inline-block w-2 h-2 rounded bg-green-500 mr-1"></span>Positive</span>
+      <span><span class="inline-block w-2 h-2 rounded bg-red-500 mr-1"></span>Negative</span>
+      <span class="mono">Sum: <span id="reward-sum" class="text-white">0.00</span></span>
+    </div>
+  </div>
+  <div id="reward-chart" class="flex items-end gap-1.5 h-28 border-b border-gray-800 pb-1"></div>
+  <div id="reward-labels" class="flex gap-1.5 mt-1"></div>
+</div>
+
+<!-- Why This Matters -->
+<div class="card mb-4" style="border-color:rgba(139,92,246,.15)">
+  <h3 class="text-xs font-semibold text-purple-400 uppercase tracking-widest mb-3">Why This Matters — The $400B Problem</h3>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-400">
+    <div>
+      <div class="text-sm font-semibold text-white mb-1">&#x1F3E6; Fintech Outage Crisis</div>
+      <p>Payment system outages cost fintechs <strong class="text-red-400">$9,400/minute</strong>. A single SEV1 incident averages <strong class="text-amber-400">68 minutes MTTR</strong> manually — that's $639K per incident. Companies like Stripe, Square, and Razorpay face 3-5 major incidents per month.</p>
+    </div>
+    <div>
+      <div class="text-sm font-semibold text-white mb-1">&#x1F916; AI-Driven Resolution</div>
+      <p>IncidentOps trains AI agents to handle the critical first 15 minutes of any incident — <strong class="text-green-400">triage, diagnosis, fix, communication</strong> — reducing MTTR by 70%. The agent learns through dense reward signals across 5 difficulty tiers with realistic cascading failure scenarios.</p>
+    </div>
+    <div>
+      <div class="text-sm font-semibold text-white mb-1">&#x1F4CA; Production-Ready Evaluation</div>
+      <p>Six-axis grading rubric evaluates <strong class="text-blue-400">resolution quality, speed, communication, business impact, diagnosis accuracy, and efficiency</strong>. Compatible with any LLM via the OpenEnv standard. Deploy as a benchmark or fine-tuning environment.</p>
+    </div>
+  </div>
+</div>
+
+<footer class="text-center text-xs text-gray-600 mt-4 pb-4">
+  IncidentOps OpenEnv v1.1.0 &mdash; Built by <span class="text-gray-400 font-semibold">Visionary Coders</span> for the OpenEnv Hackathon &mdash; Solving the $400B outage crisis with AI
+</footer>
+</div>
+
+<script>
+const PHASES=["detect","inspect","diagnose","mitigate","communicate","resolve"];
+const S=__STATE_JSON__;
+const TASKS=__TASKS_JSON__;
+let prevState=null,notifsEnabled=true,currentView='log';
+const trendData={complaints:[],sla:[]};
+const MAX_TREND=20;
+let demoRunning=false,demoTimer=null;
+
+/* ── Populate task selector ──────────────────────────────── */
+(function(){
+  const sel=document.getElementById('task-select');
+  for(const[id,cfg]of Object.entries(TASKS)){
+    const opt=document.createElement('option');
+    opt.value=id;
+    const diff=cfg.difficulty?(' ['+cfg.difficulty.toUpperCase()+']'):'';
+    opt.textContent=id.replace(/_/g,' ')+diff;
+    sel.appendChild(opt);
+  }
+  // Select current task
+  if(S&&S.task_name)sel.value=S.task_name;
+})();
+
+/* ── Toast Notifications ─────────────────────────────────── */
+function showToast(message,level='info',duration=5000){
+  if(!notifsEnabled&&level!=='critical')return;
+  const c=document.getElementById('toast-container');
+  const t=document.createElement('div');
+  const icons={critical:'\u{1F6A8}',warning:'\u26A0\uFE0F',info:'\u2139\uFE0F',success:'\u2705'};
+  t.className='toast toast-'+level;
+  t.innerHTML='<span style="font-size:1.1rem;flex-shrink:0">'+(icons[level]||icons.info)+'</span>'+
+    '<div><div style="font-weight:600;font-size:.75rem;margin-bottom:2px">'+level.toUpperCase()+'</div>'+
+    '<div>'+message+'</div></div>';
+  t.onclick=()=>{t.classList.add('leaving');setTimeout(()=>t.remove(),250)};
+  c.appendChild(t);
+  setTimeout(()=>{if(t.parentNode){t.classList.add('leaving');setTimeout(()=>t.remove(),250)}},duration);
+  while(c.children.length>5)c.removeChild(c.firstChild);
+}
+
+document.getElementById('notif-toggle').onclick=()=>{
+  notifsEnabled=!notifsEnabled;
+  document.getElementById('notif-toggle').textContent=notifsEnabled?'\u{1F514}':'\u{1F515}';
+  showToast('Notifications '+(notifsEnabled?'enabled':'muted'),'info',2000);
+};
+
+/* ── Alert Detection ─────────────────────────────────────── */
+function checkAlerts(d){
+  if(!prevState){prevState=d;return}
+  for(const[name,info]of Object.entries(d.services||{})){
+    const prev=prevState.services?.[name];
+    if(prev&&prev.status!=='down'&&info.status==='down')
+      showToast(name+' is <strong>DOWN</strong>! Immediate action required.','critical',8000);
+    if(prev&&prev.status!=='healthy'&&info.status==='healthy')
+      showToast(name+' recovered to <strong>healthy</strong>.','success',4000);
+  }
+  const sla=d.business?.sla_breach_risk??0,prevSla=prevState.business?.sla_breach_risk??0;
+  if(sla>=0.80&&prevSla<0.80)showToast('SLA breach risk at <strong>'+(sla*100).toFixed(0)+'%</strong>! Critical threshold.','critical',8000);
+  else if(sla>=0.50&&prevSla<0.50)showToast('SLA breach risk rising: <strong>'+(sla*100).toFixed(0)+'%</strong>','warning',5000);
+  const comp=d.customers?.complaint_count??0,prevComp=prevState.customers?.complaint_count??0;
+  if(comp>200&&prevComp<=200)showToast('Complaints exceeded <strong>200</strong>. Status page update needed.','warning',6000);
+  if(d.false_resolved&&!prevState.false_resolved)showToast('FALSE RESOLUTION! Incident re-opened.','critical',8000);
+  if(d.resolved&&d.done&&!(prevState.resolved&&prevState.done))showToast('Incident <strong>RESOLVED</strong>! Final score calculated.','success',6000);
+  if(d.communication_overdue&&!prevState.communication_overdue)showToast('Communication overdue! Complaints rising.','warning',6000);
+  prevState=d;
+}
+
+/* ── Trend Tracking ──────────────────────────────────────── */
+function trackTrends(d){
+  trendData.complaints.push(d.customers?.complaint_count??0);
+  trendData.sla.push((d.business?.sla_breach_risk??0)*100);
+  if(trendData.complaints.length>MAX_TREND)trendData.complaints.shift();
+  if(trendData.sla.length>MAX_TREND)trendData.sla.shift();
+}
+function drawSparkLine(id,data,color){
+  const svg=document.getElementById(id);
+  if(!svg||data.length<2)return;
+  const w=svg.clientWidth||120,h=svg.clientHeight||24;
+  const max=Math.max(...data,1),min=Math.min(...data,0),range=max-min||1;
+  const pts=data.map((v,i)=>{
+    const x=(i/(data.length-1))*w,y=h-((v-min)/range)*(h-4)-2;
+    return x.toFixed(1)+','+y.toFixed(1);
+  }).join(' ');
+  svg.innerHTML='<polyline points="'+pts+'" class="spark-line" stroke="'+color+'" />';
+}
+
+/* ── View Toggle ─────────────────────────────────────────── */
+function toggleView(v){
+  currentView=v;
+  document.getElementById('action-log').classList.toggle('hidden',v!=='log');
+  document.getElementById('action-timeline').classList.toggle('hidden',v!=='timeline');
+  document.getElementById('view-log').className=v==='log'?'text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30':'text-[10px] px-2 py-0.5 rounded bg-gray-800 text-gray-500 border border-gray-700';
+  document.getElementById('view-timeline').className=v==='timeline'?'text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30':'text-[10px] px-2 py-0.5 rounded bg-gray-800 text-gray-500 border border-gray-700';
+}
+
+/* ── Log Filter ──────────────────────────────────────────── */
+function filterLog(){
+  const q=(document.getElementById('log-search').value||'').toLowerCase();
+  for(const item of document.getElementById('action-log').children)
+    item.style.display=item.textContent.toLowerCase().includes(q)?'':'none';
+}
+
+function makePhases(){
+  const s=document.getElementById("phase-stepper"),l=document.getElementById("phase-labels");
+  s.innerHTML="";l.innerHTML="";
+  PHASES.forEach((p,i)=>{
+    s.innerHTML+='<div class="phase-dot" id="pd-'+i+'"></div>';
+    if(i<PHASES.length-1)s.innerHTML+='<div class="phase-line" id="pl-'+i+'"></div>';
+    const w=i<PHASES.length-1?"flex-1":"";
+    l.innerHTML+='<div class="text-center '+w+'" style="min-width:40px"><span class="text-[10px] text-gray-600" id="plbl-'+i+'">'+p+'</span></div>';
+  });
+}
+makePhases();
+
+function svcCard(name,info){
+  const st=info.status||"healthy";
+  const badge="badge-"+st;
+  const glow=st==="down"?"glow-red":st==="degraded"?"glow-amber":"glow-green";
+  let m="";
+  if(info.latency_ms!==undefined){
+    const lat=Math.round(info.latency_ms);
+    const lc=lat>1000?"text-red-400":lat>500?"text-amber-400":"text-green-400";
+    m+='<div class="flex justify-between"><span class="text-gray-500">Latency</span><span class="mono '+lc+'">'+lat+'ms</span></div>';
+  }
+  if(info.error_rate!==undefined){
+    const er=(info.error_rate*100).toFixed(1);
+    const ec=info.error_rate>0.3?"text-red-400":info.error_rate>0.1?"text-amber-400":"text-green-400";
+    m+='<div class="flex justify-between"><span class="text-gray-500">Errors</span><span class="mono '+ec+'">'+er+'%</span></div>';
+  }
+  if(info.connections_pct!==undefined){
+    const cp=(info.connections_pct*100).toFixed(0);
+    const cc=info.connections_pct>0.85?"text-red-400":info.connections_pct>0.7?"text-amber-400":"text-green-400";
+    m+='<div class="flex justify-between"><span class="text-gray-500">Connections</span><span class="mono '+cc+'">'+cp+'%</span></div>';
+  }
+  if(info.replication_lag_ms!==undefined){
+    const rl=Math.round(info.replication_lag_ms);
+    m+='<div class="flex justify-between"><span class="text-gray-500">Rep Lag</span><span class="mono">'+rl+'ms</span></div>';
+  }
+  if(info.replicas!==undefined)
+    m+='<div class="flex justify-between"><span class="text-gray-500">Replicas</span><span class="mono">'+info.replicas+'</span></div>';
+  if(info.cpu_usage_pct!==undefined){
+    const cpu=info.cpu_usage_pct;
+    const cc=cpu>80?'#ef4444':cpu>60?'#f59e0b':'#22c55e';
+    m+='<div class="mt-1"><div class="flex justify-between"><span class="text-gray-500">CPU</span><span class="mono" style="color:'+cc+'">'+cpu.toFixed(0)+'%</span></div>'+
+      '<div class="res-bar-bg mt-0.5"><div class="res-bar" style="width:'+cpu+'%;background:'+cc+'"></div></div></div>';
+  }
+  if(info.memory_usage_pct!==undefined){
+    const mem=info.memory_usage_pct;
+    const mc=mem>80?'#ef4444':mem>60?'#f59e0b':'#22c55e';
+    m+='<div><div class="flex justify-between"><span class="text-gray-500">Memory</span><span class="mono" style="color:'+mc+'">'+mem.toFixed(0)+'%</span></div>'+
+      '<div class="res-bar-bg mt-0.5"><div class="res-bar" style="width:'+mem+'%;background:'+mc+'"></div></div></div>';
+  }
+  if(info.response_time_p99!==undefined){
+    const p99=Math.round(info.response_time_p99);
+    const pc=p99>2000?"text-red-400":p99>1000?"text-amber-400":"text-green-400";
+    m+='<div class="flex justify-between"><span class="text-gray-500">P99</span><span class="mono '+pc+'">'+p99+'ms</span></div>';
+  }
+  return '<div class="bg-gray-900/60 rounded-lg p-3 border border-gray-800 '+glow+' transition-all">'+
+    '<div class="flex items-center justify-between mb-2"><span class="text-sm font-medium text-white">'+name+'</span><span class="badge '+badge+'">'+st+'</span></div>'+
+    '<div class="space-y-1 text-xs">'+m+'</div></div>';
+}
+
+function buildTimeline(d){
+  const tl=document.getElementById("action-timeline");tl.innerHTML="";
+  const actions=d.actions_taken||[];
+  if(!actions.length){tl.innerHTML='<div class="text-xs text-gray-600 py-4 text-center">No actions yet</div>';return}
+  actions.forEach((a,i)=>{
+    const r=d.rewards?.[i];
+    const rc=r!==undefined?(r>=0?"text-green-400":"text-red-400"):"text-gray-500";
+    const rv=r!==undefined?(r>=0?"+":"")+r.toFixed(2):"";
+    let dotClass="dot-action";
+    if(a.includes("send_status")||a.includes("send_vip")||a.includes("escalate"))dotClass="dot-comms";
+    if(a.includes("resolve_incident"))dotClass="dot-resolve";
+    if(r!==undefined&&r<-0.10)dotClass="dot-alert";
+    const elapsed=Math.max(0,(d.incident?.minutes_elapsed||0)-(actions.length-i-1)*5);
+    tl.innerHTML+='<div class="timeline-item"><div class="timeline-dot '+dotClass+'"></div>'+
+      '<div class="flex items-center justify-between"><div><span class="text-[10px] text-gray-600 mono">'+elapsed+'min</span>'+
+      '<div class="text-xs text-gray-300 mono mt-0.5">'+a+'</div></div>'+
+      '<span class="text-xs mono '+rc+'">'+rv+'</span></div></div>';
+  });
+  tl.scrollTop=tl.scrollHeight;
+}
+
+function renderDepGraph(d){
+  const el=document.getElementById("dep-graph");
+  const deps=d.dependencies||{};el.innerHTML="";
+  for(const[svc,targets]of Object.entries(deps)){
+    const ss=d.services?.[svc]?.status||"healthy";
+    const sc=ss==="down"?"text-red-400":ss==="degraded"?"text-amber-400":"text-green-400";
+    if(!targets.length){
+      el.innerHTML+='<div><span class="'+sc+'">'+svc+'</span> <span class="text-gray-600">(independent)</span></div>';
+    }else{
+      el.innerHTML+='<div><span class="'+sc+'">'+svc+'</span> <span class="text-gray-600">\u2192</span> '+
+        targets.map(t=>{
+          const ts=d.services?.[t]?.status||(t==="db"?d.database?.status:"healthy")||"healthy";
+          const tc=ts==="down"?"text-red-400":ts==="degraded"?"text-amber-400":"text-green-400";
+          return '<span class="'+tc+'">'+t+'</span>';
+        }).join(', ')+'</div>';
+    }
+  }
+}
+
+function render(d){
+  if(!d||!d.incident)return;
+  checkAlerts(d);trackTrends(d);
+
+  const sev=d.incident.severity||"sev3";
+  const sevEl=document.getElementById("sev-badge");
+  sevEl.textContent=sev.toUpperCase();sevEl.className="badge sev-"+sev;
+  document.getElementById("inc-id").textContent=d.incident.incident_id;
+  document.getElementById("inc-title").textContent=d.incident.title;
+  document.getElementById("elapsed").textContent=d.incident.minutes_elapsed;
+  document.getElementById("step-count").textContent=d.step_count;
+  document.getElementById("max-steps").textContent=d.max_steps;
+  document.getElementById("task-label").textContent=d.task_name||"";
+
+  const db=document.getElementById("done-badge");
+  if(d.done&&d.resolved)db.classList.remove("hidden");else db.classList.add("hidden");
+
+  const banner=document.getElementById("banner");
+  if(d.done&&d.resolved)banner.className="card mb-4 glow-green";
+  else if(sev==="sev1")banner.className="card mb-4 glow-red";
+  else if(sev==="sev2")banner.className="card mb-4 glow-amber";
+  else banner.className="card mb-4 glow-blue";
+
+  const curPhase=PHASES.indexOf(d.incident.phase);
+  PHASES.forEach((_,i)=>{
+    const dot=document.getElementById("pd-"+i),lbl=document.getElementById("plbl-"+i);
+    if(i<curPhase){dot.className="phase-dot done";lbl.className="text-[10px] text-green-500"}
+    else if(i===curPhase){dot.className="phase-dot active";lbl.className="text-[10px] text-blue-400 font-semibold"}
+    else{dot.className="phase-dot";lbl.className="text-[10px] text-gray-600"}
+    if(i<PHASES.length-1){const line=document.getElementById("pl-"+i);line.className=i<curPhase?"phase-line done":"phase-line"}
+  });
+
+  const score=parseFloat(d._score||0);
+  const offset=220-(220*Math.min(score,1));
+  document.getElementById("score-arc").setAttribute("stroke-dashoffset",offset);
+  const scoreColor=score>=0.7?"#22c55e":score>=0.4?"#f59e0b":"#ef4444";
+  document.getElementById("score-arc").setAttribute("stroke",scoreColor);
+  document.getElementById("score-text").textContent=score.toFixed(2);
+  document.getElementById("score-text").style.color=scoreColor;
+
+  const sc=document.getElementById("services");sc.innerHTML="";
+  let total=0,healthy=0;
+  const allSvc={...(d.services||{})};allSvc["db"]=d.database;
+  for(const[name,info]of Object.entries(allSvc)){
+    sc.innerHTML+=svcCard(name,info);total++;
+    if((info.status||"healthy")==="healthy")healthy++;
+  }
+  document.getElementById("healthy-count").textContent=healthy+"/"+total+" healthy";
+
+  document.getElementById("complaints").textContent=d.customers?.complaint_count??0;
+  document.getElementById("vip").textContent=d.customers?.vip_users_affected??0;
+  const sent=d.customers?.sentiment_score??0;
+  const sentEl=document.getElementById("sentiment");sentEl.textContent=sent.toFixed(2);
+  sentEl.style.color=sent<-0.5?"#ef4444":sent<-0.2?"#f59e0b":sent<0?"#eab308":"#22c55e";
+  document.getElementById("sent-bar").style.width=((sent+1)/2*100)+"%";
+  document.getElementById("sent-bar").style.background=sent<-0.5?"#ef4444":sent<0?"#f59e0b":"#22c55e";
+  const noise=d.customers?.social_noise_score??0;
+  document.getElementById("social").textContent=noise.toFixed(2);
+  document.getElementById("noise-bar").style.width=(noise*100)+"%";
+
+  document.getElementById("rev-min").textContent="$"+(d.business?.revenue_loss_per_min??0).toLocaleString();
+  document.getElementById("rev-total").textContent="$"+Math.round(d.business?.total_revenue_lost??0).toLocaleString();
+  const sla=(d.business?.sla_breach_risk??0)*100;
+  document.getElementById("sla-bar").style.width=sla+"%";
+  document.getElementById("sla-pct").textContent=sla.toFixed(0)+"%";
+  const comp=(d.business?.compliance_risk??0)*100;
+  document.getElementById("comp-bar").style.width=comp+"%";
+  document.getElementById("comp-pct").textContent=comp.toFixed(0)+"%";
+
+  const boolMark=(v)=>v?["\u2713","text-green-400"]:["\u2717","text-red-400"];
+  const ops=d.operations||{};
+  for(const[id,key]of[["op-status","status_page_updated"],["op-vip","vip_outreach_sent"],["op-esc","human_escalated"],["op-bridge","incident_bridge_opened"]]){
+    const[txt,cls]=boolMark(ops[key]);
+    const el=document.getElementById(id);el.textContent=txt;el.className=cls+" text-lg";
+  }
+
+  const rcEl=document.getElementById("root-cause");
+  if(d.root_cause_identified){rcEl.textContent=d.incident.root_cause_hint||d.incident.root_cause;rcEl.className="text-sm mt-1 text-green-400"}
+  else{rcEl.textContent="Not yet identified";rcEl.className="text-sm mt-1 text-gray-400"}
+
+  renderDepGraph(d);
+
+  const log=document.getElementById("action-log");log.innerHTML="";
+  (d.actions_taken||[]).forEach((a,i)=>{
+    const r=d.rewards?.[i];
+    const rc=r!==undefined?(r>=0?"text-green-400":"text-red-400"):"text-gray-500";
+    const rv=r!==undefined?(r>=0?"+":"")+r.toFixed(2):"";
+    log.innerHTML+='<div class="flex items-center gap-2 py-1 px-2 rounded text-xs bg-gray-900/40 border border-gray-800/50 mono">'+
+      '<span class="text-gray-600 w-5 text-right">'+(i+1)+'</span>'+
+      '<span class="flex-1 text-gray-300">'+a+'</span>'+
+      '<span class="'+rc+'">'+rv+'</span></div>';
+  });
+  log.scrollTop=log.scrollHeight;
+  filterLog();
+
+  buildTimeline(d);
+
+  drawSparkLine('complaints-spark',trendData.complaints,'#ef4444');
+  drawSparkLine('sla-spark',trendData.sla,'#f59e0b');
+
+  const chart=document.getElementById("reward-chart"),lbls=document.getElementById("reward-labels");
+  chart.innerHTML="";lbls.innerHTML="";
+  const rewards=d.rewards||[];let rSum=0;
+  const maxAbs=Math.max(0.25,...rewards.map(r=>Math.abs(r)));
+  rewards.forEach((r,i)=>{
+    rSum+=r;
+    const h=Math.max(4,Math.abs(r)/maxAbs*90);
+    const color=r>=0?"bg-green-500":"bg-red-500";
+    chart.innerHTML+='<div class="flex-1 flex flex-col justify-end items-center"><div class="reward-bar w-full '+color+'" style="height:'+h+'px;opacity:'+(0.5+Math.abs(r)/maxAbs*0.5)+'"></div></div>';
+    lbls.innerHTML+='<div class="flex-1 text-center text-[9px] text-gray-600 mono">S'+(i+1)+'</div>';
+  });
+  document.getElementById("reward-sum").textContent=rSum.toFixed(2);
+
+  // Update step button state
+  document.getElementById('step-btn').disabled=d.done;
+}
+
+render(S);
+
+/* ── Interactive Controls ────────────────────────────────── */
+async function resetTask(){
+  const taskId=document.getElementById('task-select').value;
+  try{
+    const r=await fetch('/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task_id:taskId})});
+    const j=await r.json();
+    if(r.ok){
+      showToast('Scenario <strong>'+taskId.replace(/_/g,' ')+'</strong> loaded.','info',3000);
+      prevState=null;trendData.complaints=[];trendData.sla=[];
+      // Fetch full state to render
+      const sr=await fetch('/state'),scr=await fetch('/score');
+      const sj=await sr.json(),scj=await scr.json();
+      if(sj.state){sj.state._score=scj.score??0;render(sj.state)}
+    }else{showToast('Reset failed: '+(j.detail||'unknown error'),'critical',5000)}
+  }catch(e){showToast('Network error: '+e.message,'critical',5000)}
+}
+
+function updateActionTarget(){
+  // no-op for now, target selector stays fixed
+}
+
+async function executeStep(){
+  const action=document.getElementById('action-select').value;
+  const target=document.getElementById('target-select').value;
+  const needsTarget=['inspect_service','inspect_logs','restart_service','rollback_service','scale_service'].includes(action);
+  const body={action_type:action};
+  if(needsTarget)body.target_service=target;
+  if(action==='scale_service')body.scale_target=3;
+  try{
+    document.getElementById('step-btn').disabled=true;
+    const r=await fetch('/step',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const j=await r.json();
+    if(r.ok){
+      const reward=j.reward;const msg=j.info?.message||j.info?.error||'';
+      const level=reward>=0?'success':'warning';
+      showToast('<strong>'+action+'</strong>: '+msg+' (reward: '+(reward>=0?'+':'')+reward.toFixed(2)+')' ,level,4000);
+      if(j.observation){
+        const sr=await fetch('/state'),scr=await fetch('/score');
+        const sj=await sr.json(),scj=await scr.json();
+        if(sj.state){sj.state._score=scj.score??0;render(sj.state)}
+      }
+      if(j.done){
+        showToast('Episode finished! Final score: <strong>'+((j.info?.score??0)*100).toFixed(0)+'%</strong>','info',8000);
+      }
+    }else{showToast('Step failed: '+(j.detail||'unknown'),'critical',5000)}
+  }catch(e){showToast('Network error: '+e.message,'critical',5000)}
+  document.getElementById('step-btn').disabled=false;
+}
+
+/* ── Auto-Demo ───────────────────────────────────────────── */
+const DEMO_SEQUENCES={
+  single_service_outage:[
+    {action_type:'inspect_logs',target_service:'payment_api'},
+    {action_type:'inspect_service',target_service:'payment_api'},
+    {action_type:'rollback_service',target_service:'payment_api'},
+    {action_type:'send_status_update'},
+    {action_type:'send_vip_update'},
+    {action_type:'resolve_incident'},
+  ],
+  dependency_degradation:[
+    {action_type:'inspect_service',target_service:'payment_api'},
+    {action_type:'inspect_logs',target_service:'ledger_service'},
+    {action_type:'restart_service',target_service:'ledger_service'},
+    {action_type:'restart_service',target_service:'notification_service'},
+    {action_type:'send_status_update'},
+    {action_type:'send_vip_update'},
+    {action_type:'resolve_incident'},
+  ],
+  multi_service_incident:[
+    {action_type:'inspect_service',target_service:'payment_api'},
+    {action_type:'inspect_logs',target_service:'ledger_service'},
+    {action_type:'failover_database'},
+    {action_type:'restart_service',target_service:'ledger_service'},
+    {action_type:'restart_service',target_service:'payment_api'},
+    {action_type:'escalate_to_human'},
+    {action_type:'send_status_update'},
+    {action_type:'send_vip_update'},
+    {action_type:'resolve_incident'},
+  ],
+  memory_leak_degradation:[
+    {action_type:'inspect_logs',target_service:'payment_api'},
+    {action_type:'inspect_service',target_service:'payment_api'},
+    {action_type:'restart_service',target_service:'payment_api'},
+    {action_type:'send_status_update'},
+    {action_type:'send_vip_update'},
+    {action_type:'resolve_incident'},
+  ],
+  cascading_timeout_storm:[
+    {action_type:'inspect_service',target_service:'notification_service'},
+    {action_type:'inspect_logs',target_service:'notification_service'},
+    {action_type:'restart_service',target_service:'notification_service'},
+    {action_type:'restart_service',target_service:'payment_api'},
+    {action_type:'send_status_update'},
+    {action_type:'send_vip_update'},
+    {action_type:'resolve_incident'},
+  ],
+};
+
+async function startAutoDemo(){
+  if(demoRunning)return;
+  const taskId=document.getElementById('task-select').value;
+  const seq=DEMO_SEQUENCES[taskId];
+  if(!seq){showToast('No demo sequence for this scenario','warning',3000);return}
+
+  demoRunning=true;
+  document.getElementById('demo-btn').classList.add('hidden');
+  document.getElementById('demo-stop-btn').classList.remove('hidden');
+  document.getElementById('demo-status').classList.remove('hidden');
+  document.getElementById('demo-btn').classList.add('demo-active');
+
+  // Reset first
+  showToast('Starting auto-demo for <strong>'+taskId.replace(/_/g,' ')+'</strong>...','info',3000);
+  await fetch('/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task_id:taskId})});
+  prevState=null;trendData.complaints=[];trendData.sla=[];
+  const sr0=await fetch('/state'),scr0=await fetch('/score');
+  const sj0=await sr0.json(),scj0=await scr0.json();
+  if(sj0.state){sj0.state._score=scj0.score??0;render(sj0.state)}
+
+  let i=0;
+  async function nextStep(){
+    if(!demoRunning||i>=seq.length){stopAutoDemo();return}
+    document.getElementById('demo-step-num').textContent=(i+1)+'/'+seq.length;
+    const body=seq[i];
+    try{
+      const r=await fetch('/step',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const j=await r.json();
+      const reward=j.reward;const msg=j.info?.message||j.info?.error||'';
+      const lbl=body.action_type+(body.target_service?' → '+body.target_service:'');
+      showToast('<strong>'+lbl+'</strong> → '+(reward>=0?'+':'')+reward.toFixed(2),'info',3000);
+      const sr=await fetch('/state'),scr=await fetch('/score');
+      const sj=await sr.json(),scj=await scr.json();
+      if(sj.state){sj.state._score=scj.score??0;render(sj.state)}
+      if(j.done){
+        showToast('Demo complete! Final score: <strong>'+((j.info?.score??0)*100).toFixed(0)+'%</strong>','success',10000);
+        stopAutoDemo();return;
+      }
+    }catch(e){showToast('Demo error: '+e.message,'critical',5000);stopAutoDemo();return}
+    i++;
+    demoTimer=setTimeout(nextStep,2000);
+  }
+  demoTimer=setTimeout(nextStep,1500);
+}
+
+function stopAutoDemo(){
+  demoRunning=false;
+  if(demoTimer)clearTimeout(demoTimer);
+  document.getElementById('demo-btn').classList.remove('hidden','demo-active');
+  document.getElementById('demo-stop-btn').classList.add('hidden');
+  document.getElementById('demo-status').classList.add('hidden');
+}
+
+/* ── SSE Real-time Connection ────────────────────────────── */
+let sseRetries=0;
+function connectSSE(){
+  const dot=document.getElementById('sse-dot'),label=document.getElementById('sse-label');
+  try{
+    const es=new EventSource('/events');
+    es.onopen=()=>{
+      dot.className='w-2 h-2 rounded-full bg-green-500 pulse';
+      label.textContent='LIVE';label.className='text-xs text-green-500 mono';
+      sseRetries=0;
+    };
+    es.addEventListener('state',(e)=>{
+      try{const data=JSON.parse(e.data);if(data.state){data.state._score=data.score??0;render(data.state)}}catch(err){}
+    });
+    es.addEventListener('alert',(e)=>{
+      try{const data=JSON.parse(e.data);showToast(data.message,data.level||'info',data.duration||5000)}catch(err){}
+    });
+    es.onerror=()=>{
+      dot.className='w-2 h-2 rounded-full bg-amber-500';
+      label.textContent='RECONNECTING';label.className='text-xs text-amber-500 mono';
+      es.close();sseRetries++;
+      if(sseRetries>3){startPolling()}
+      else{setTimeout(connectSSE,2000*sseRetries)}
+    };
+  }catch(e){startPolling()}
+}
+
+let pollInterval=null;
+function startPolling(){
+  if(pollInterval)return;
+  const dot=document.getElementById('sse-dot'),label=document.getElementById('sse-label');
+  dot.className='w-2 h-2 rounded-full bg-blue-500 pulse';
+  label.textContent='POLLING';label.className='text-xs text-blue-400 mono';
+  pollInterval=setInterval(async()=>{
+    try{
+      const[stateR,scoreR]=await Promise.all([fetch("/state"),fetch("/score")]);
+      const stateJ=await stateR.json(),scoreJ=await scoreR.json();
+      if(stateJ.state){stateJ.state._score=scoreJ.score??0;render(stateJ.state)}
+    }catch(e){}
+  },2000);
+}
+
+connectSSE();
+</script>
+</body>
+</html>

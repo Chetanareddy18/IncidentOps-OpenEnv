@@ -1,0 +1,78 @@
+name: "IncidentOps OpenEnv"
+version: "1.1.0"
+description: >
+  A real-world incident command training environment for AI agents
+  in fintech production operations. Agents must triage outages,
+  inspect dependencies, choose mitigation actions, communicate with
+  affected users, and minimise business impact under time pressure.
+  Features dependency-aware action effects, granular reward shaping,
+  multi-objective grading (technical recovery, customer impact,
+  communication, efficiency, business impact), and 5 tasks across
+  3 difficulty levels.
+tags:
+  - openenv
+  - incident-response
+  - devops
+  - fintech
+  - customer-support
+  - sre
+author: "Visionary Coders"
+
+tasks:
+  - id: "single_service_outage"
+    description: >
+      Easy — Payment API outage after a recent deployment.
+      Agent must inspect, rollback/restart, communicate, and resolve.
+    difficulty: easy
+    max_steps: 8
+    success_criteria: >
+      Restore payment_api to healthy, update status page, resolve within 5 steps.
+    expected_score_range: "0.75–0.95"
+
+  - id: "dependency_degradation"
+    description: >
+      Medium — Payment API degraded due to upstream ledger pressure compounded
+      by resource overload. Notification service shows early degradation.
+      Requires dependency analysis, competing priority management, and targeted mitigation.
+    difficulty: medium
+    max_steps: 10
+    success_criteria: >
+      Identify ledger as root cause, restart ledger, manage notification service,
+      send status + VIP updates, resolve within 7 steps.
+    expected_score_range: "0.50–0.85"
+
+  - id: "multi_service_incident"
+    description: >
+      Hard — Cascading multi-service failure from database saturation.
+      Complex triage, sequencing, escalation, and communication required.
+    difficulty: hard
+    max_steps: 12
+    success_criteria: >
+      Failover database first, restart dependent services in order,
+      escalate, communicate to status page and VIPs, resolve within 8 steps.
+    expected_score_range: "0.40–0.80"
+
+  - id: "memory_leak_degradation"
+    description: >
+      Medium — Payment API gradually degrading from a memory leak.
+      Agent must identify the leak pattern, restart correctly, and manage DB pressure.
+    difficulty: medium
+    max_steps: 10
+    success_criteria: >
+      Identify memory leak in payment_api, restart payment_api to clear leak,
+      manage DB connection pressure, communicate proactively, resolve within 6 steps.
+    expected_score_range: "0.60–0.90"
+
+  - id: "cascading_timeout_storm"
+    description: >
+      Hard — Notification service network failure cascading into payment retries,
+      overwhelming ledger and saturating the database. Reverse-cascade diagnosis required.
+    difficulty: hard
+    max_steps: 12
+    success_criteria: >
+      Trace reverse cascade to notification_service, fix root cause,
+      failover database if needed, escalate, manage social noise, resolve within 8 steps.
+    expected_score_range: "0.35–0.75"
+
+entrypoint:
+  command: ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"]
