@@ -1,3 +1,21 @@
+---
+title: IncidentOps OpenEnv
+emoji: 🚨
+colorFrom: red
+colorTo: orange
+sdk: docker
+app_port: 7860
+pinned: true
+license: mit
+short_description: AI incident management benchmark - 5 tasks, deterministic graders, LLM baseline
+tags:
+  - openenv
+  - incident-management
+  - reinforcement-learning
+  - benchmark
+  - fintech
+---
+
 # IncidentOps OpenEnv
 
 **A real-world incident command training environment for AI agents in fintech production operations.**
