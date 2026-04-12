@@ -2,12 +2,12 @@
 title: IncidentOps OpenEnv
 emoji: 🚨
 colorFrom: red
-colorTo: orange
+colorTo: yellow
 sdk: docker
 app_port: 7860
 pinned: true
 license: mit
-short_description: AI incident management benchmark - 5 tasks, deterministic graders, LLM baseline
+short_description: AI incident management benchmark with 5 tasks
 tags:
   - openenv
   - incident-management
