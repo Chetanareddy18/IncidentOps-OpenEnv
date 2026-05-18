@@ -336,19 +336,6 @@ The included baseline uses an LLM (Qwen2.5-72B-Instruct via HF Router) that reas
 
 ---
 
-## Example Episode (Easy Task)
-
-```
-[START] task=single_service_outage env=incidentops model=Qwen/Qwen2.5-72B-Instruct
-[STEP] step=1 action=inspect_service('payment_api') reward=0.03 done=false error=null
-[STEP] step=2 action=rollback_service('payment_api', 'v2.2.0') reward=0.18 done=false error=null
-[STEP] step=3 action=send_status_update reward=0.08 done=false error=null
-[STEP] step=4 action=inspect_service('ledger') reward=0.03 done=false error=null
-[STEP] step=5 action=inspect_logs('ledger') reward=0.01 done=false error=null
-[STEP] step=6 action=restart_service('ledger') reward=0.08 done=false error=null
-[STEP] step=7 action=resolve_incident reward=0.13 done=true error=null
----
-
 ## Example Run
 
 **Easy task — agent solves it in 7 steps:**
@@ -384,8 +371,6 @@ The included baseline uses an LLM (Qwen2.5-72B-Instruct via HF Router) that reas
 - Multi-agent — separate commander and communication roles
 - Custom scenario builder — define your own incident templates
 - Curriculum learning — auto-progress through difficulty levels
-
----
 
 ---
 
