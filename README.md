@@ -374,6 +374,5 @@ The included baseline uses an LLM (Qwen2.5-72B-Instruct via HF Router) that reas
 
 ---
 
-**Built with care by Chetana, Varshini & Nandini**
 
 [⭐ Star on GitHub](https://github.com/Chetanareddy18/IncidentOps-OpenEnv) · [MIT License](LICENSE)
